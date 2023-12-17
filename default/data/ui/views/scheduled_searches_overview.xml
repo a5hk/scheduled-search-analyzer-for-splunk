@@ -1,0 +1,226 @@
+<form version="1.1">
+  <label>Scheduled Searches Overview</label>
+  <fieldset submitButton="false">
+    <input type="radio" token="description">
+      <label></label>
+      <choice value="show">Show descriptions</choice>
+      <choice value="hide">Hide descriptions</choice>
+      <default>hide</default>
+      <initialValue>hide</initialValue>
+      <change>
+        <condition value="hide">
+          <unset token="show_hide_desc"></unset>
+        </condition>
+        <condition value="show">
+          <set token="show_hide_desc">true</set>
+        </condition>        
+      </change>
+    </input>
+  </fieldset>
+  <row depends="$show_hide_desc$">
+    <panel>
+      <html>
+        <p>
+          Number of searches executed yesterday, displayed in a calendar heatmap format. Each cell represents one minute and is color-coded based on the number of searches executed during that minute. 
+          The darker the cell, the higher the number of searches executed during that minute. This information can be used to optimize the scheduling of the searches and ensure that the searches are distributed evenly throughout the day.
+          You can click on each cell to investigate further. This will update the timeline charts, which display searches starting from the minute you clicked up to an hour later.
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Number of searches executed every minute $yesterday_am$</title>
+      <viz type="calendar_heatmap_app.calendar_heatmap">
+        <search>
+          <query>| rest /services/saved/searches earliest_time=-1d@d-1m@m latest_time=@d-12h
+| search cron_schedule!="" disabled!=1
+| fields scheduled_times
+| eval scheduled_times=strftime(scheduled_times,"%F %T")
+| mvexpand scheduled_times
+| eval _time=strptime(scheduled_times, "%F %T")
+| timechart span=1m count</query>
+          <earliest>-1d@d</earliest>
+          <latest>@d-12h</latest>
+          <progress>
+            <eval token="yesterday_am">"from " . strftime(relative_time(now(), "-1d@d"), "%F %I:%M:%S %p") . " until " . strftime(relative_time(now(), "-1d@d+12h"), "%F %I:%M:%S %p")</eval>
+          </progress>
+        </search>
+        <option name="calendar_heatmap_app.calendar_heatmap.cellPadding">2</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.cellSize">12</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.cellStyle">square</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.legendType">uniform</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.maxColor">#d41f1f</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.minColor">#fbc2b6</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.numOfBins">5</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.showLegend">true</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.splitMonths">true</option>
+        <option name="drilldown">all</option>
+        <option name="height">220</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="form.timerange.earliest">$click.value2$</set>
+          <eval token="form.timerange.latest">$click.value2$ + 3600</eval>
+        </drilldown>
+      </viz>
+    </panel>
+    <panel>
+      <title>Number of searches executed every minute $yesterday_pm$</title>
+      <viz type="calendar_heatmap_app.calendar_heatmap">
+        <search>
+          <query>| rest /services/saved/searches earliest_time=-1d@d+12h-1m latest_time=@d
+| search cron_schedule!="" disabled!=1
+| fields scheduled_times
+| eval scheduled_times=strftime(scheduled_times,"%F %T")
+| mvexpand scheduled_times
+| eval _time=strptime(scheduled_times, "%F %T")
+| timechart span=1m count</query>
+          <earliest>-1d@d+12h</earliest>
+          <latest>@d</latest>
+          <progress>
+            <eval token="yesterday_pm">"from " . strftime(relative_time(now(), "@d-12h"), "%F %I:%M:%S %p") . " until " . strftime(relative_time(now(), "@d"), "%F %I:%M:%S %p")</eval>
+          </progress>
+        </search>
+        <option name="calendar_heatmap_app.calendar_heatmap.cellPadding">2</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.cellSize">12</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.cellStyle">square</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.legendType">uniform</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.maxColor">#d41f1f</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.minColor">#fbc2b6</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.numOfBins">5</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.showLegend">true</option>
+        <option name="calendar_heatmap_app.calendar_heatmap.splitMonths">true</option>
+        <option name="drilldown">all</option>
+        <option name="height">220</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="form.timerange.earliest">$click.value2$</set>
+          <eval token="form.timerange.latest">$click.value2$ + 3600</eval>
+        </drilldown>
+      </viz>
+    </panel>
+  </row>
+  <row depends="$show_hide_desc$">
+    <panel>
+      <html>
+        <p>
+          The following chart displays the average delay time of searches performed yesterday. By analyzing this chart, you can identify the time intervals when the average delay time was the highest and lowest. 
+          This information can be used to optimize the scheduling saved searches and reduce the average delay time. Clicking on this chart will update the timeline charts to display events occurring within a 30-minute window centered around the selected time.
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Delays</title>
+      <chart>
+        <search>
+          <query>index=_internal sourcetype=scheduler scheduled_time=* 
+| eval delay = dispatch_time - scheduled_time
+| timechart span=1m avg(delay) as delay
+| eval delay = round(delay, 2)</query>
+          <earliest>-1d@d</earliest>
+          <latest>@d</latest>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">zero</option>
+        <option name="charting.drilldown">all</option>
+        <option name="height">300</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <eval token="form.timerange.earliest">$click.value$ - 1800</eval>
+          <eval token="form.timerange.latest">$click.value$ + 1800</eval>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row depends="$show_hide_desc$">
+    <panel>
+      <html>
+        <p>
+          By analyzing the following two charts, you can identify the start time, name, owner, app, and duration of each scheduled search. Additionally, you can identify the time intervals when multiple searches are scheduled to run simultaneously.
+          This information can be used to optimize the scheduling of the searches and reduce the overlaps or gaps. By clicking on these charts you can see further details about specific searches (at the end of the page).
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Timeline based on scheduled time</title>
+      <input type="time" token="timerange">
+        <label></label>
+        <default>
+          <earliest>-1d@d</earliest>
+          <latest>-1d@d+1h</latest>
+        </default>
+      </input>
+      <viz type="timeline_app.timeline">
+        <search>
+          <query>index=_internal sourcetype=scheduler scheduled_time=* 
+| eval run_time=run_time*1000, user_app=user . " / " . app
+| sort 0 scheduled_time
+| table scheduled_time savedsearch_name user_app run_time</query>
+          <earliest>$timerange.earliest$</earliest>
+          <latest>$timerange.latest$</latest>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="height">560</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="timeline_app.timeline.axisTimeFormat">SECONDS</option>
+        <option name="timeline_app.timeline.colorMode">categorical</option>
+        <option name="timeline_app.timeline.maxColor">#DA5C5C</option>
+        <option name="timeline_app.timeline.minColor">#FFE8E8</option>
+        <option name="timeline_app.timeline.numOfBins">6</option>
+        <option name="timeline_app.timeline.tooltipTimeFormat">SECONDS</option>
+        <option name="timeline_app.timeline.useColors">1</option>
+        <drilldown>
+          <set token="search_name">$row.savedsearch_name$</set>
+        </drilldown>
+      </viz>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Timeline  based on dispatch time</title>
+      <viz type="timeline_app.timeline">
+        <search>
+          <query>index=_internal sourcetype=scheduler scheduled_time=* 
+| eval run_time=run_time*1000, user_app=user . " / " . app
+| sort 0 dispatch_time
+| table dispatch_time savedsearch_name user_app run_time</query>
+          <earliest>$timerange.earliest$</earliest>
+          <latest>$timerange.latest$</latest>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="height">560</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="timeline_app.timeline.axisTimeFormat">SECONDS</option>
+        <option name="timeline_app.timeline.colorMode">categorical</option>
+        <option name="timeline_app.timeline.maxColor">#DA5C5C</option>
+        <option name="timeline_app.timeline.minColor">#FFE8E8</option>
+        <option name="timeline_app.timeline.numOfBins">6</option>
+        <option name="timeline_app.timeline.tooltipTimeFormat">SECONDS</option>
+        <option name="timeline_app.timeline.useColors">1</option>
+        <drilldown>
+          <set token="search_name">$row.savedsearch_name$</set>
+        </drilldown>
+      </viz>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Search details</title>
+      <table>
+        <search>
+          <query>| rest /services/saved/searches/$search_name|u$/
+| table title eai:acl.owner eai:acl.app cron_schedule next_scheduled_time search
+| rename eai:acl.owner as owner, eai:acl.app as app</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+</form>
